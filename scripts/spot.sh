@@ -57,6 +57,25 @@ function add_song_to_playlist {
     echo -e "\\n ${Green}Added ${Yellow}$TRACK_NAME ${Green}to ${Yellow}$PLAYLIST_NAME ${Color_Off}"
 }
 
+function check_track_in_playlist {
+    curl -sS -X "GET" "https://api.spotify.com/v1/playlists/$1/tracks" -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer $ACCESS_TOKEN" > ~/.spotify/playlisttracks.json
+    ERROR_MESSAGE=$(jq .error.message ~/.spotify/playlisttracks.json | tr -d '"')
+
+    if [ "$ERROR_MESSAGE" != "null" ]
+    then
+        echo -e "${Red}${ERROR_MESSAGE}${Color_off}"
+        exit
+    else
+        while read playlist_track_id; do
+            PL_TRACK_URI=$(jq -r '.track.uri' <<< "$playlist_track_id")
+            if [ "$PL_TRACK_URI" == "$2" ]; then
+                echo -e "${Yellow}${TRACK_NAME}${Color_off} already exists in playlist ${Yellow}${PLAYLIST_NAME}${Color_Off}. Exiting..."
+                exit
+            fi
+        done <<<$(jq -c '.items[]' ~/.spotify/playlisttracks.json)
+    fi
+}
+
 # Print info for currently playing song
 if [[ "$1" == 'now' ]]; then
     get_currently_playing
@@ -94,6 +113,7 @@ if [[ "$1" == 'add' ]]; then
         if [ "$PLAYLIST_NAME" == "$2" ]; then
             echo -e "${Green}found playlist ${2}${Color_Off}"
             PLAYLIST_ID=$(jq -r '.id' <<< "$playlist")
+            check_track_in_playlist $PLAYLIST_ID $TRACK_URI
             add_song_to_playlist $PLAYLIST_ID $TRACK_URI
             break
         fi
@@ -113,6 +133,5 @@ if [[ "$1" == 'auth' ]]; then
     # echo $TOKEN_RESPONSE
 
     RESPONSE=$(curl -H "Authorization Basic {$AUTHORIZATION_HEADER}" -H "Content-Type application/x-www-form-urlencoded" "https://accounts.spotify.com/api/token?refresh_token={$REFRESH_TOKEN}&redirect_uri={$REDIRECT_URI}&grant_type=refresh_token&client_id={$CLIENT_ID}&code_verifier={$CODE_VERIFIER}")
-    
     echo $RESPONSE
 fi
