@@ -4,16 +4,23 @@ COMMANDS=('auth', 'now', 'add', 'pls')
 
 URL_GET_CURRENTLY_PLAYING="https://api.spotify.com/v1/me/player/currently-playing"
 URL_GET_PLAYLISTS="https://api.spotify.com/v1/me/playlists"
-
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 set -a # automatically export all variables
-source ~/.spotify/.env
-source ~/.spotify/.colours
+source $SCRIPT_DIR/.env
+source $SCRIPT_DIR/.colours
 set +a
 
 # if [[ "$#" != 1 ]]; then
 #     echo "Please provide one of the following commands: ${COMMANDS[@]}"
 #     exit
 # fi
+
+export_env_var() {
+    if ! grep -q "$1=" $SCRIPT_DIR/.env; then
+        echo "export $1=" >> $SCRIPT_DIR/.env
+    fi
+    sed -i -r "s/$1=.*/$1=${!1}/g" $SCRIPT_DIR/.env
+}
 
 function get_currently_playing {
     curl -sS -X "GET" $URL_GET_CURRENTLY_PLAYING -H "Accept: application/json" -H "Content-Type: application/json" -H "Authorization: Bearer $ACCESS_TOKEN" > ~/.spotify/trackdata.json
@@ -132,6 +139,13 @@ if [[ "$1" == 'auth' ]]; then
     # TOKEN_RESPONSE=$(curl -sS -i -L ${LOCATION//[$'\t\r\n ']})
     # echo $TOKEN_RESPONSE
 
-    RESPONSE=$(curl -H "Authorization Basic {$AUTHORIZATION_HEADER}" -H "Content-Type application/x-www-form-urlencoded" "https://accounts.spotify.com/api/token?refresh_token={$REFRESH_TOKEN}&redirect_uri={$REDIRECT_URI}&grant_type=refresh_token&client_id={$CLIENT_ID}&code_verifier={$CODE_VERIFIER}")
-    echo $RESPONSE
+    # RESPONSE=$(curl -H "Authorization Basic {$AUTHORIZATION_HEADER}" -H "Content-Type application/x-www-form-urlencoded" "https://accounts.spotify.com/api/token?refresh_token={$REFRESH_TOKEN}&redirect_uri={$REDIRECT_URI}&grant_type=refresh_token&client_id={$CLIENT_ID}&code_verifier={$CODE_VERIFIER}")
+    # echo $RESPONSE
+    
+    RESPONSE=$(curl -sS -X POST "https://accounts.spotify.com/api/token" -H "Content-Type: application/x-www-form-urlencoded" -d "grant_type=client_credentials&client_id=${SPOT_CLIENT_ID}&client_secret=${SPOT_CLIENT_SECRET}")
+    AUTH_TOKEN=$(jq -r '.access_token' <<< "$RESPONSE")
+    echo $AUTH_TOKEN
+    export AUTH_TOKEN=$AUTH_TOKEN
+    export_env_var "AUTH_TOKEN"
 fi
+
